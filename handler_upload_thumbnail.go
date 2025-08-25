@@ -34,6 +34,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
 	// TODO: implement the upload here
+	vMetadata, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+	if vMetadata.UserID != userID {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+	
 	const maxMemory = 10 << 20
 	err = r.ParseMultipartForm(maxMemory)
 	if err != nil {
@@ -45,6 +55,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
+	
 	contentType := header.Header.Get("Content-Type")
 	thumbnailData, err := io.ReadAll(file)
 	if err != nil {
@@ -54,15 +65,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	b64Thumbnail := base64.StdEncoding.EncodeToString(thumbnailData)
 	data_url := "data:" + contentType + ";base64," + b64Thumbnail
 
-	vMetadata, err := cfg.db.GetVideo(videoID)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
-		return
-	}
-	if vMetadata.UserID != userID {
-		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
-		return
-	}
 	vMetadata.ThumbnailURL = &data_url
 	err = cfg.db.UpdateVideo(vMetadata)
 	if err != nil {
