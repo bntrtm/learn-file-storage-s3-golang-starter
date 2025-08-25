@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"crypto/rand"
 	"path/filepath"
+	"encoding/base64"
 	"strings"
 )
 
@@ -27,10 +29,25 @@ func (cfg apiConfig) getAssetURL(assetPath string) string {
 	return fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, assetPath)
 }
 
+func (cfg apiConfig) getS3URL(key string) string {
+	// 'key' being the object filename
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, key)
+}
+
 func mediaTypeToExt(mediaType string) string {
 	parts := strings.Split(mediaType, "/")
 	if len(parts) != 2 {
 		return ".bin"
 	}
 	return "." + parts[1]
+}
+
+func makeFilename() (newFilename string, err error) {
+	randFilenameBytes := make([]byte, 32)
+	_, err = rand.Read(randFilenameBytes)
+	if err != nil {
+		return "", err
+	}
+	randFilenameString := base64.RawURLEncoding.EncodeToString(randFilenameBytes)
+	return randFilenameString, nil
 }
