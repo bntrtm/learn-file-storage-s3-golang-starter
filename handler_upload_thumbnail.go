@@ -6,7 +6,9 @@ import (
 	"log"
 	"fmt"
 	"mime"
+	"crypto/rand"
 	"net/http"
+	"encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -69,8 +71,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Invalid Content-Type", err)
 		return
 	}
+	
+	randFilename := make([]byte, 32)
+	_, err = rand.Read(randFilename)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+	randFilenameString := base64.RawURLEncoding.EncodeToString(randFilename)
 
-	assetPath := getAssetPath(videoID, extension)
+	assetPath := getAssetPath(randFilenameString, extension)
 	assetDiskPath := cfg.getAssetDiskPath(assetPath)
 	
 	assetFile, err := os.Create(assetDiskPath)
