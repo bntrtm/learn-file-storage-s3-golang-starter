@@ -4,6 +4,7 @@ import (
 	"io"
 	"fmt"
 	"net/http"
+	"encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -50,6 +51,9 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
+	b64Thumbnail := base64.StdEncoding.EncodeToString(thumbnailData)
+	data_url := "data:" + contentType + ";base64," + b64Thumbnail
+
 	vMetadata, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
@@ -59,18 +63,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
 		return
 	}
-	newThumbnail := thumbnail{
-		data:		thumbnailData,
-		mediaType:	contentType,
-	}
-	videoThumbnails[videoID] = newThumbnail
-	url := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s", cfg.port, videoIDString)
-	vMetadata.ThumbnailURL = &url
+	vMetadata.ThumbnailURL = &data_url
 	err = cfg.db.UpdateVideo(vMetadata)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
+
 	respondWithJSON(w, http.StatusOK, vMetadata)
 	return
 }
