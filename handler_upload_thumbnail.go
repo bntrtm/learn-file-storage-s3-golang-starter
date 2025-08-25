@@ -2,9 +2,11 @@ package main
 
 import (
 	"io"
+	"os"
+	"log"
 	"fmt"
+	"mime"
 	"net/http"
-	"encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -55,17 +57,40 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
+	defer file.Close()
+
+	// save uploaded thumbnail to path on disk
+	extension, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid Content-Type", err)
+		return
+	}
+	if extension != "image/jpeg" && extension != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "Invalid Content-Type", err)
+		return
+	}
+
+	assetPath := getAssetPath(videoID, extension)
+	assetDiskPath := cfg.getAssetDiskPath(assetPath)
 	
-	contentType := header.Header.Get("Content-Type")
-	thumbnailData, err := io.ReadAll(file)
+	assetFile, err := os.Create(assetDiskPath)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
-	b64Thumbnail := base64.StdEncoding.EncodeToString(thumbnailData)
-	data_url := "data:" + contentType + ";base64," + b64Thumbnail
+	defer assetFile.Close()
 
-	vMetadata.ThumbnailURL = &data_url
+	_, err = io.Copy(assetFile, file)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
+	// save path on disk into video metadata
+	assetUrl := cfg.getAssetURL(assetPath)
+	log.Printf("Saving new thumbnail at: %s", assetUrl)
+	vMetadata.ThumbnailURL = &assetUrl
+	
 	err = cfg.db.UpdateVideo(vMetadata)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
