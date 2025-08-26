@@ -88,11 +88,6 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 	aspectRatioLabel := getAspectRatioLabel(aspectRatio)
 
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
-		return
-	}
-
 	// reset temp file's file pointer to beginning so it can be read again
 	_, err = tempFile.Seek(0, io.SeekStart)
 	if err != nil {
@@ -106,10 +101,22 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 	key := path.Join(aspectRatioLabel, randFilename)
 
+	processedFilepath, err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+	processedFile, err := os.Open(processedFilepath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+	defer processedFile.Close()
+
 	putObjectParams := s3.PutObjectInput{
 		Bucket:			&(cfg.s3Bucket),
 		Key:			&(key),
-		Body:			tempFile,
+		Body:			processedFile,
 		ContentType:	&extension,
 	}
 	_, err = cfg.s3Client.PutObject(context.Background(), &putObjectParams)

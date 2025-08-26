@@ -57,6 +57,20 @@ func makeFilename() (newFilename string, err error) {
 	return randFilenameString, nil
 }
 
+func processVideoForFastStart(filePath string) (string, error) {
+	outputPath := filePath + ".processing"
+	cmdToRun := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", outputPath)
+	//var cmdBuffer bytes.Buffer
+	var errBuffer bytes.Buffer
+	//cmdToRun.Stdout = &cmdBuffer
+	cmdToRun.Stderr = &errBuffer
+	err := cmdToRun.Run()
+	if err != nil {
+		return "", fmt.Errorf("ffprobe failed: %w: %s", err, errBuffer.String())
+	}
+	return outputPath, nil
+}
+
 func getVideoAspectRatio(filePath string) (string, error) {
 	cmdToRun := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
 	var cmdBuffer bytes.Buffer
