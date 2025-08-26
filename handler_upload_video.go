@@ -6,6 +6,7 @@ import (
 	"log"
 	"fmt"
 	"mime"
+	"path"
 	"context"
 	"net/http"
 
@@ -66,9 +67,6 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	//assetPath := getAssetPath(videoIDString, extension)
-	//assetDiskPath := cfg.getAssetDiskPath(assetPath)
-
 	tempFile, err := os.CreateTemp("", "tubely-upload.mp4")
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
@@ -78,6 +76,18 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	defer tempFile.Close() // defer is LIFO
 
 	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
+	aspectRatio, err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+	aspectRatioLabel := getAspectRatioLabel(aspectRatio)
+
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
@@ -94,10 +104,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
 	}
+	key := path.Join(aspectRatioLabel, randFilename)
 
 	putObjectParams := s3.PutObjectInput{
 		Bucket:			&(cfg.s3Bucket),
-		Key:			&(randFilename),
+		Key:			&(key),
 		Body:			tempFile,
 		ContentType:	&extension,
 	}
@@ -108,7 +119,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	// save path on disk into video metadata
-	objectUrl := cfg.getS3URL(randFilename)
+	objectUrl := cfg.getS3URL(aspectRatioLabel, randFilename)
 	log.Printf("Saving new video at: %s", objectUrl)
 	vMetadata.VideoURL = &objectUrl
 	
@@ -120,4 +131,13 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	respondWithJSON(w, http.StatusOK, vMetadata)
 	return
+}
+
+func getAspectRatioLabel(aspect string) string {
+	label := ""
+	if aspect == "16:9" { label = "landscape"
+} else if aspect == "9:16" { label = "portrait"
+} else { label = "other"}
+	log.Printf("Sorting %s video into S3 bucket with aspect ratio: %s", aspect, label)
+	return label
 }
