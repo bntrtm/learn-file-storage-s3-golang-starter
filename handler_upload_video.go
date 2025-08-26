@@ -126,7 +126,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	// save path on disk into video metadata
-	objectUrl := cfg.getS3URL(aspectRatioLabel, randFilename)
+	objectUrl := cfg.getS3URL(key)
 	log.Printf("Saving new video at: %s", objectUrl)
 	vMetadata.VideoURL = &objectUrl
 	
