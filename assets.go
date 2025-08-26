@@ -5,17 +5,13 @@ import (
 	"os/exec"
 	"fmt"
 	"log"
-	"time"
 	"bytes"
 	"errors"
-	"context"
 	"strings"
 	"crypto/rand"
 	"path/filepath"
 	"encoding/json"
 	"encoding/base64"
-
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 func (cfg apiConfig) ensureAssetsDir() error {
@@ -41,19 +37,6 @@ func (cfg apiConfig) getAssetURL(assetPath string) string {
 func (cfg apiConfig) getS3URL(prefix, key string) string {
 	// 'key' being the object filename
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", cfg.s3Bucket, cfg.s3Region, prefix, key)
-}
-
-func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-	presignClient := s3.NewPresignClient(s3Client)
-	objInput := s3.GetObjectInput{
-		Bucket: &bucket,
-		Key: &key,
-	}
-	req, err := presignClient.PresignGetObject(context.Background(), &objInput, s3.WithPresignExpires(expireTime))
-	if err != nil {
-		return "", err
-	}
-	return req.URL, nil
 }
 
 func mediaTypeToExt(mediaType string) string {

@@ -5,17 +5,14 @@ import (
 	"os"
 	"log"
 	"fmt"
-	"time"
 	"mime"
 	"path"
-	"strings"
 	"context"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 	"github.com/google/uuid"
 )
 
@@ -129,18 +126,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	// save path on disk into video metadata
-	//objectUrl := cfg.getS3URL(aspectRatioLabel, randFilename)
-	objectUrl := cfg.s3Bucket + "," + key
+	objectUrl := cfg.getS3URL(aspectRatioLabel, randFilename)
 	log.Printf("Saving new video at: %s", objectUrl)
 	vMetadata.VideoURL = &objectUrl
 	
 	err = cfg.db.UpdateVideo(vMetadata)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
-		return
-	}
-
-	vMetadata, err = cfg.dbVideoToSignedVideo(vMetadata)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
@@ -157,35 +147,4 @@ func getAspectRatioLabel(aspect string) string {
 } else { label = "other"}
 	log.Printf("Sorting %s video into S3 bucket with aspect ratio: %s", aspect, label)
 	return label
-}
-
-func(cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	if video.VideoURL == nil {
-		// empty videos are fine, or else we can't create drafts in the first place!
-		return video, nil
-	}
-	splitSlice := strings.Split(*(video.VideoURL), ",")
-	if len(splitSlice) < 2 {
-		switch len(splitSlice) {
-		case 0:
-			log.Print("neither bucket or key found; returning unsigned video in original state")
-			return video, nil
-		case 1:
-			log.Print("bucket or key not found; returning unsigned video in original state")
-			return video, nil
-		}
-	}
-	if splitSlice[0] == "" || splitSlice[1] == "" {
-		log.Print("bucket or key not found; returning unsigned video in original state")
-		return video, nil
-	}
-	bucket, key := strings.TrimSpace(splitSlice[0]), strings.TrimSpace(splitSlice[1])
-	presignedURL, err := generatePresignedURL(cfg.s3Client, bucket, key, time.Minute)
-	if err != nil {
-		log.Print("Error presigning URL; returning unsigned video in original state")
-		return video, nil
-	}
-	video.VideoURL = &presignedURL
-	log.Printf("Successfully generated a presigned URL; returning video with signature: %s", presignedURL)
-	return video, nil
 }
